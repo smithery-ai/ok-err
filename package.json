@@ -1,6 +1,6 @@
 {
 	"name": "okay-error",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"author": "Henry Mao",
 	"private": false,
 	"description": "A small opinionated library to bring Rust-like results idiomatically to TypeScript.",
