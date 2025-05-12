@@ -1,11 +1,14 @@
 {
 	"name": "rslt",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"author": "Henry Mao",
 	"description": "A small opinionated library to bring Rust-like results idiomatically to TypeScript.",
 	"main": "dist/index.js",
 	"types": "src/index.ts",
-	"files": ["dist", "src"],
+	"files": [
+		"dist",
+		"src"
+	],
 	"scripts": {
 		"build": "tsc",
 		"clean": "rm -rf dist",
