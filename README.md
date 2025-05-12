@@ -1,10 +1,10 @@
-# `ok-err`
+# `okay-error`
 
 > **Typed, chain‑friendly, JSON‑safe Results for TypeScript**  
 
 A small opinionated TypeScript library providing strongly-typed `Result` objects with chaining capabilities, inspired by Rust `std::result`.
 
-## Why *ok-err*?
+## Why *okay-error*?
 
 * **Plain object compatibility** - an `Ok` is `{ ok: true, value }`, an `Err` is `{ ok: false, error }`. Log it, persist it, send it over the wire.
 * **Type‑level errors** - every possible failure is visible in the function signature (`Result<T, E>`), not thrown from the shadows. Rely on the type checker to ensure you handle every possible failure.
@@ -17,7 +17,7 @@ A small opinionated TypeScript library providing strongly-typed `Result` objects
 ## Install
 
 ```bash
-npm i ok-err
+npm i okay-error
 ```
 
 ---
@@ -26,7 +26,7 @@ npm i ok-err
 
 ### From try-catch to Result
 
-Here's how `ok-err` changes error handling from exceptions to data:
+Here's how `okay-error` changes error handling from exceptions to data:
 
 ```ts
 // Traditional approach with try-catch
@@ -40,7 +40,7 @@ try {
 }
 
 // Alternative approach with Result
-import { ok, err, result } from 'ok-err';
+import { ok, err, result } from 'okay-error';
 
 // Define functions that return Result types
 function getUserById(id: number) {
@@ -118,10 +118,10 @@ Err {
 
 ### Working with async operations
 
-`ok-err` can be used with async code to handle errors as data:
+`okay-error` can be used with async code to handle errors as data:
 
 ```ts
-import { result } from 'ok-err';
+import { result } from 'okay-error';
 
 // Wrap fetch with Result to handle both network and parsing errors
 async function fetchUserData(userId: string) {
