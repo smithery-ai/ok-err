@@ -1,5 +1,7 @@
 # `okay-error`
 
+[![NPM Version](https://img.shields.io/npm/v/okay-error?style=flat-square)](https://www.npmjs.com/package/okay-error)
+
 > **Typed, chain‑friendly, JSON‑safe Results for TypeScript**  
 
 A small opinionated TypeScript library providing strongly-typed `Result` objects with chaining capabilities, inspired by Rust `std::result`.
