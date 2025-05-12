@@ -1,7 +1,8 @@
 {
-	"name": "rslt",
-	"version": "0.1.1",
+	"name": "ok-err",
+	"version": "0.1.0",
 	"author": "Henry Mao",
+	"private": false,
 	"description": "A small opinionated library to bring Rust-like results idiomatically to TypeScript.",
 	"main": "dist/index.js",
 	"types": "src/index.ts",

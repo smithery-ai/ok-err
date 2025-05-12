@@ -1,10 +1,10 @@
-# `rslt`
+# `ok-err`
 
 > **Typed, chain‑friendly, JSON‑safe Results for TypeScript**  
 
 A small opinionated TypeScript library providing strongly-typed `Result` objects with chaining capabilities, inspired by Rust `std::result`.
 
-## Why *rslt*?
+## Why *ok-err*?
 
 * **Plain object compatibility** - an `Ok` is `{ ok: true, value }`, an `Err` is `{ ok: false, error }`. Log it, persist it, send it over the wire.
 * **Type‑level errors** - every possible failure is visible in the function signature (`Result<T, E>`), not thrown from the shadows. Rely on the type checker to ensure you handle every possible failure.
@@ -17,7 +17,7 @@ A small opinionated TypeScript library providing strongly-typed `Result` objects
 ## Install
 
 ```bash
-npm i rslt
+npm i ok-err
 ```
 
 ---
@@ -26,7 +26,7 @@ npm i rslt
 
 ### From try-catch to Result
 
-Here's how `rslt` changes error handling from exceptions to data:
+Here's how `ok-err` changes error handling from exceptions to data:
 
 ```ts
 // Traditional approach with try-catch
@@ -40,7 +40,7 @@ try {
 }
 
 // Alternative approach with Result
-import { ok, err, result } from 'rslt';
+import { ok, err, result } from 'ok-err';
 
 // Define functions that return Result types
 function getUserById(id: number) {
@@ -118,10 +118,10 @@ Err {
 
 ### Working with async operations
 
-`rslt` can be used with async code to handle errors as data:
+`ok-err` can be used with async code to handle errors as data:
 
 ```ts
-import { result } from 'rslt';
+import { result } from 'ok-err';
 
 // Wrap fetch with Result to handle both network and parsing errors
 async function fetchUserData(userId: string) {
