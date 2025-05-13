@@ -234,10 +234,28 @@ export type Result<ValueType, ErrorType = unknown> =
  * const success = ok(42);
  * console.log(success.value); // 42
  *
+ * @overload
  * @param value - The value to wrap in an Ok result
  * @returns An Ok result containing the value
  */
-export const ok = <T>(value: T): Ok<T> => new Ok(value)
+export function ok<T>(value: T): Ok<T>
+/**
+ * Construct a successful Result with undefined value.
+ *
+ * @example
+ * const success = ok();
+ * console.log(success.value); // undefined
+ *
+ * @overload
+ * @returns An Ok result containing undefined
+ */
+export function ok(): Ok<undefined>
+/**
+ * Implementation of ok function
+ */
+export function ok<T>(value?: T): Ok<T> {
+	return new Ok(value as T)
+}
 
 /**
  * Construct a typed error Result with a discriminated error type and optional payload.
@@ -350,7 +368,7 @@ export function result<ValueType, ErrorType>(
 	// Promise‑like
 	if (isPromiseLike<ValueType>(work)) {
 		return Promise.resolve(work)
-			.then(ok)
+			.then(ok<ValueType>)
 			.catch((e: unknown) => errAny<ErrorType>(e as ErrorType))
 	}
 

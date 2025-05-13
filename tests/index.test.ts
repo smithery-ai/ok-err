@@ -11,6 +11,11 @@ describe("constructors", () => {
 	])("%s()", (_, r, expected) => {
 		expect(r.ok).toBe(expected)
 	})
+
+	test("ok undefined()", () => {
+		expect(ok().ok).toBe(true)
+		expect(ok().value).toBe(undefined)
+	})
 })
 
 /* ------------------------------------------------------------------ */
