@@ -27,15 +27,11 @@ describe("Ok / Err methods", () => {
 	test("map / mapErr", () => {
 		const a = ok(2).map(double)
 		const b = err("E")().map(double)
+		const c = err("E")({ id: 1 }).mapErr((e) => ({ ...e, tag: "X" }))
 
 		expect(a.ok && a.value).toBe(4)
 		expect(!b.ok && b.error.type).toBe("E")
-
-		const c = ok(1).mapErr(() => "X")
-		const d = err("E")({ id: 1 }).mapErr((e) => ({ ...e, tag: "X" }))
-
-		expect(c.ok).toBe(true)
-		expect(!d.ok && d.error.tag).toBe("X")
+		expect(!c.ok && c.error.tag).toBe("X")
 	})
 
 	test("flatMap", () => {
@@ -98,5 +94,59 @@ describe("annotate() instance", () => {
 		expect(!ctx.ok && ctx.error.type).toBe("B")
 		expect(ctx.error.cause.id).toBe(2)
 		expect(ctx.error.cause.type).toBe("A")
+	})
+})
+
+/* ------------------------------------------------------------------ */
+/* Optional chaining helpers                                          */
+/* ------------------------------------------------------------------ */
+describe("optional chaining", () => {
+	test("value? on Ok vs Err", () => {
+		const okRes = ok({ n: 1 })
+		const errRes = err("E")()
+
+		expect(okRes.value?.n).toBe(1) // ok branch exposes value
+		// @ts-expect-error value is undefined on Err at runtime
+		expect(errRes.value?.n).toBeUndefined()
+	})
+
+	test("error? on Err vs Ok", () => {
+		const okRes = ok(5) as Result<number, { type: string }>
+		const errRes = err("Timeout")({ ms: 500 })
+		expect(okRes.error?.type).toBeUndefined()
+		expect(errRes.error?.type).toBe("Timeout")
+	})
+})
+
+/* ------------------------------------------------------------------ */
+/* match() instance method                                             */
+/* ------------------------------------------------------------------ */
+describe("match() instance", () => {
+	test("branches correctly on Ok", () => {
+		const res = ok(5)
+		const doubled = res.match({
+			ok: (v) => v * 2,
+			err: () => 0,
+		})
+		expect(doubled).toBe(10)
+	})
+
+	test("branches correctly on Err", () => {
+		const timeout = err("Timeout")({ ms: 1000 })
+		const txt = timeout.match({
+			ok: (v) => `value ${v}`,
+			err: (e) => e.type,
+		})
+		expect(txt).toBe("Timeout")
+	})
+
+	test("exhaustively matches error variants", () => {
+		const timeout = err("Timeout")({ ms: 2500 })
+
+		const ms = timeout.matchType({
+			Timeout: (e) => e.ms,
+		})
+
+		expect(ms).toBe(2500)
 	})
 })

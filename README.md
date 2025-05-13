@@ -93,7 +93,7 @@ function boot(): Result<void, BootErr> {
     // Add higher-level context while preserving the original error
     return cfg.annotate('BootConfig', { phase: 'init' });
   }
-  return ok(undefined);
+  return ok();
 }
 ```
 
@@ -208,6 +208,8 @@ async function displayUserProfile(userId: string) {
 | `map(fn)` | transform value | no‑op |
 | `mapErr(fn)` | no‑op | transform error |
 | `flatMap(fn)` | chain another `Result` | propagate error |
+| `match(arms)` | run `ok` arm | run `err` arm |
+| `matchType(cases)` | N/A | match on error type |
 | `unwrap()` | get value | throw error |
 | `or(fallback)` | value | fallback |
 | `[Symbol.iterator]()` | yields value | yields nothing |
@@ -246,6 +248,75 @@ const bootError = configError.annotate('BootConfig', { phase: 'init' });
 console.log(bootError.error.type);    // 'BootConfig'
 console.log(bootError.error.cause.type); // 'ConfigFileMissing'
 ```
+
+## Pattern matching example
+
+### Basic pattern matching with `match`
+
+```ts
+// Define a function that returns a Result
+function divide(a: number, b: number): Result<number, { type: string; message: string }> {
+  if (b === 0) {
+    return err('DivideByZero')({ message: 'Cannot divide by zero' });
+  }
+  return ok(a / b);
+}
+
+// Use match to handle both success and error cases in one expression
+const result = divide(10, 2).match({
+  ok: (value) => `Result: ${value}`,
+  err: (error) => `Error: ${error.message}`
+});
+
+console.log(result); // "Result: 5"
+
+// With an error case
+const errorResult = divide(10, 0).match({
+  ok: (value) => `Result: ${value}`,
+  err: (error) => `Error: ${error.message}`
+});
+
+console.log(errorResult); // "Error: Cannot divide by zero"
+```
+
+### Type-based pattern matching with `matchType`
+
+```ts
+// Define a discriminated union of error types
+type ApiError =
+  | { type: 'NotFound'; id: string }
+  | { type: 'Timeout'; ms: number }
+  | { type: 'Unauthorized'; reason: string };
+
+// Function that returns different error types
+function fetchData(id: string): Result<{ name: string }, ApiError> {
+  // Simulate different errors based on input
+  if (id === '404') {
+    return err('NotFound')({ id });
+  } else if (id === 'slow') {
+    return err('Timeout')({ ms: 5000 });
+  } else if (id === 'auth') {
+    return err('Unauthorized')({ reason: 'Token expired' });
+  }
+  
+  return ok({ name: 'Sample Data' });
+}
+
+// Use matchType to handle each error type differently
+const response = fetchData('slow');
+
+if (!response.ok) {
+  const errorMessage = response.matchType({
+    NotFound: (e) => `Item ${e.id} could not be found`,
+    Timeout: (e) => `Request timed out after ${e.ms}ms`,
+    Unauthorized: (e) => `Access denied: ${e.reason}`
+  });
+  
+  console.log(errorMessage); // "Request timed out after 5000ms"
+}
+```
+
+The `matchType` method provides exhaustive pattern matching for discriminated union error types, ensuring you handle all possible error cases at compile time.
 
 ---
 

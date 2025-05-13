@@ -20,6 +20,9 @@ export class Ok<ValueType> implements Iterable<ValueType> {
 	get raw() {
 		return { ok: true, value: this.value }
 	}
+	get error(): undefined {
+		return undefined
+	}
 
 	/**
 	 * Transform the contained value using the provided function.
@@ -60,6 +63,17 @@ export class Ok<ValueType> implements Iterable<ValueType> {
 		fn: (v: ValueType) => Result<NewValue, ErrorType>,
 	): Result<NewValue, ErrorType> {
 		return fn(this.value)
+	}
+
+	/**
+	 * Pattern‑match on this Result.
+	 * The `err` branch will never run for Ok, but must be provided for exhaustiveness.
+	 */
+	match<OnOk, OnErr>(arms: {
+		ok: (v: ValueType) => OnOk
+		err: (e: never) => OnErr
+	}): OnOk {
+		return arms.ok(this.value)
 	}
 
 	/**
@@ -116,6 +130,10 @@ export class Err<ErrorType = unknown> implements Iterable<never> {
 
 	get raw() {
 		return { ok: false, error: this.error }
+	}
+
+	get value(): undefined {
+		return undefined
 	}
 
 	/**
@@ -178,6 +196,52 @@ export class Err<ErrorType = unknown> implements Iterable<never> {
 		_fn: (v: never) => Result<NewValue, ErrorType>,
 	): Err<ErrorType> {
 		return this
+	}
+
+	/**
+	 * Pattern‑match on this Result.
+	 * The `ok` branch will never run for Err, but must be provided.
+	 */
+	match<OnOk, OnErr>(arms: {
+		ok: (v: never) => OnOk
+		err: (e: ErrorType) => OnErr
+	}): OnErr {
+		return arms.err(this.error)
+	}
+
+	/**
+	 * Pattern match on the error type for discriminated union errors.
+	 * This method will only be available when ErrorType has a 'type' property.
+	 *
+	 * @example
+	 * // Assuming error is a discriminated union with 'type' property
+	 * return someResult.mapErr(e => e).matchType({
+	 *   NotFound: (e) => `Item ${e.id} not found`,
+	 *   Timeout: (e) => `Operation timed out after ${e.ms}ms`,
+	 * });
+	 *
+	 * @param cases - Object with handlers for each possible error type
+	 * @returns The result of calling the matching handler
+	 */
+	matchType<
+		Cases extends {
+			[K in Extract<ErrorType, { type: string }>["type"]]: (
+				e: Extract<ErrorType, { type: K }>,
+			) => unknown
+		},
+	>(
+		this: Err<Extract<ErrorType, { type: string }>>, // narrow "this"
+		cases: Cases,
+	): ReturnType<Cases[keyof Cases]>
+
+	matchType<A = never>(
+		this: Err<Exclude<ErrorType, { type: string }>>, // only if *no* `type`
+		_cases?: A,
+	): never
+
+	matchType(cases: Record<string, (e: never) => unknown>): unknown {
+		// @ts-ignore
+		return cases[this.error.type](this.error)
 	}
 
 	/**
