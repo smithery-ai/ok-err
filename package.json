@@ -6,10 +6,7 @@
 	"description": "A small opinionated library to bring Rust-like results idiomatically to TypeScript.",
 	"main": "dist/index.js",
 	"types": "src/index.ts",
-	"files": [
-		"dist",
-		"src"
-	],
+	"files": ["dist", "src"],
 	"scripts": {
 		"build": "tsc",
 		"clean": "rm -rf dist",

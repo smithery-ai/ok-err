@@ -210,41 +210,6 @@ export class Err<ErrorType = unknown> implements Iterable<never> {
 	}
 
 	/**
-	 * Pattern match on the error type for discriminated union errors.
-	 * This method will only be available when ErrorType has a 'type' property.
-	 *
-	 * @example
-	 * // Assuming error is a discriminated union with 'type' property
-	 * return someResult.mapErr(e => e).matchType({
-	 *   NotFound: (e) => `Item ${e.id} not found`,
-	 *   Timeout: (e) => `Operation timed out after ${e.ms}ms`,
-	 * });
-	 *
-	 * @param cases - Object with handlers for each possible error type
-	 * @returns The result of calling the matching handler
-	 */
-	matchType<
-		Cases extends {
-			[K in Extract<ErrorType, { type: string }>["type"]]: (
-				e: Extract<ErrorType, { type: K }>,
-			) => unknown
-		},
-	>(
-		this: Err<Extract<ErrorType, { type: string }>>, // narrow "this"
-		cases: Cases,
-	): ReturnType<Cases[keyof Cases]>
-
-	matchType<A = never>(
-		this: Err<Exclude<ErrorType, { type: string }>>, // only if *no* `type`
-		_cases?: A,
-	): never
-
-	matchType(cases: Record<string, (e: never) => unknown>): unknown {
-		// @ts-ignore
-		return cases[this.error.type](this.error)
-	}
-
-	/**
 	 * Try to extract a value from this Err result.
 	 * Since this is an Err, this always throws the contained error.
 	 *
@@ -442,4 +407,38 @@ export function result<ValueType, ErrorType>(
 	} catch (e) {
 		return errAny<ErrorType>(e as ErrorType)
 	}
+}
+
+/* -------------------------------------------------- */
+/* Universal matchType                               */
+/* -------------------------------------------------- */
+
+/**
+ * Exhaustively pattern‑match on the `type` discriminant of any object
+ * (error or otherwise).  Works on unions like
+ *
+ * ```ts
+ * type Foo =
+ *   | { type: "A"; a: number }
+ *   | { type: "B"; b: string };
+ *
+ * declare const foo: Foo;
+ * const out = matchType(foo, {
+ *   A: v => v.a,
+ *   B: v => v.b.length,
+ * });
+ * ```
+ *
+ * If you omit a case, TypeScript raises an error.
+ */
+export function matchType<
+	// Discriminated‑union we’re matching on
+	T extends { type: string },
+	// Exhaustive handler object – must have a key for every `type`
+	Cases extends {
+		[K in T["type"]]: (val: Extract<T, { type: K }>) => unknown
+	},
+>(value: T, cases: Cases): ReturnType<Cases[keyof Cases]> {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	return (cases as any)[value.type](value as any)
 }

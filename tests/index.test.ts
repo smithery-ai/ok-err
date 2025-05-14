@@ -1,4 +1,4 @@
-import { type Result, err, errAny, ok, result } from "../src"
+import { type Result, err, errAny, matchType, ok, result } from "../src"
 
 /* ------------------------------------------------------------------ */
 /* Constructors                                                        */
@@ -139,11 +139,34 @@ describe("match() instance", () => {
 		})
 		expect(txt).toBe("Timeout")
 	})
+})
+
+/* ------------------------------------------------------------------ */
+/* matchType() instance method                                       */
+/* ------------------------------------------------------------------ */
+describe("matchType()", () => {
+	test("works with implicit error types", () => {
+		function multipleErrors() {
+			// biome-ignore lint/correctness/noConstantCondition: <explanation>
+			if (false) {
+				return err("a")()
+			} else {
+				return err("b")()
+			}
+		}
+
+		expect(
+			matchType(multipleErrors().error, {
+				a: (e) => e.type,
+				b: (e) => e.type,
+			}),
+		).toBe("b")
+	})
 
 	test("exhaustively matches error variants", () => {
 		const timeout = err("Timeout")({ ms: 2500 })
 
-		const ms = timeout.matchType({
+		const ms = matchType(timeout.error, {
 			Timeout: (e) => e.ms,
 		})
 
