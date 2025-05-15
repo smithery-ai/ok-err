@@ -1,4 +1,17 @@
-import { type Result, err, errAny, matchType, ok, result } from "../src"
+import {
+	type Result,
+	annotate,
+	err,
+	errAny,
+	flatMap,
+	map,
+	mapErr,
+	match,
+	ok,
+	orElse,
+	result,
+	unwrap,
+} from "../src"
 
 /* ------------------------------------------------------------------ */
 /* Constructors                                                        */
@@ -6,7 +19,7 @@ import { type Result, err, errAny, matchType, ok, result } from "../src"
 describe("constructors", () => {
 	test.each([
 		["ok", ok(1), true],
-		["err", err("X")(), false],
+		["err", err("X"), false],
 		["errUnknown", errAny(new Error()), false],
 	])("%s()", (_, r, expected) => {
 		expect(r.ok).toBe(expected)
@@ -25,32 +38,27 @@ describe("Ok / Err methods", () => {
 	const double = (n: number) => n * 2
 
 	test("map / mapErr", () => {
-		const a = ok(2).map(double)
-		const b = err("E")().map(double)
-		const c = err("E")({ id: 1 }).mapErr((e) => ({ ...e, tag: "X" }))
+		const a = map(ok(2), double)
+		const b = map(err("E"), double)
+		const c = mapErr(err("E", { id: 1 }), (e) => ({ ...e, tag: "X" }))
 
 		expect(a.ok && a.value).toBe(4)
-		expect(!b.ok && b.error.type).toBe("E")
+		expect(!b.ok && b.error).toBe("E")
 		expect(!c.ok && c.error.tag).toBe("X")
 	})
 
 	test("flatMap", () => {
 		const div = (a: number, b: number): Result<number> =>
-			b === 0 ? err("Div0")() : ok(a / b)
+			b === 0 ? err("Div0") : ok(a / b)
 
-		expect(ok(10).flatMap((n) => div(n, 5)).ok).toBe(true)
-		expect(ok(10).flatMap((n) => div(n, 0)).ok).toBe(false)
+		expect(flatMap(ok(10), (n) => div(n, 5)).ok).toBe(true)
+		expect(flatMap(ok(10), (n) => div(n, 0)).ok).toBe(false)
 	})
 
 	test("unwrap / or", () => {
-		expect(ok(42).unwrap()).toBe(42)
-		expect(ok(42).or(7)).toBe(42)
-		expect(err("E")().or(7)).toBe(7)
-	})
-
-	test("iterable", () => {
-		expect([...ok(3)]).toEqual([3])
-		expect([...err("E")()]).toEqual([])
+		expect(unwrap(ok(42))).toBe(42)
+		expect(orElse(ok(42), 7)).toBe(42)
+		expect(orElse(err("E"), 7)).toBe(7)
 	})
 })
 
@@ -75,25 +83,20 @@ describe("result()", () => {
 		expect(good.ok).toBe(true)
 		expect(!bad.ok).toBe(true)
 	})
-
-	test("rehydrate", () => {
-		const rawJson = JSON.parse(JSON.stringify(ok(9))) as Result<number, unknown>
-		const live = result(rawJson)
-		expect(live.ok && live.value).toBe(9)
-	})
 })
 
 /* ------------------------------------------------------------------ */
 /* annotate() instance method                                          */
 /* ------------------------------------------------------------------ */
-describe("annotate() instance", () => {
+describe("annotate() function", () => {
 	test("wraps Err with context", () => {
-		const base = err("A")({ id: 2 })
-		const ctx = base.annotate("B", { extra: 1 })
+		const base = err("A", { id: 2 })
+		const ctx = annotate(base, "B", { extra: 1 })
 
 		expect(!ctx.ok && ctx.error.type).toBe("B")
-		expect(ctx.error.cause.id).toBe(2)
-		expect(ctx.error.cause.type).toBe("A")
+		const cause = ctx.error.cause as { id: number; type: string }
+		expect(cause.id).toBe(2)
+		expect(cause.type).toBe("A")
 	})
 })
 
@@ -103,28 +106,38 @@ describe("annotate() instance", () => {
 describe("optional chaining", () => {
 	test("value? on Ok vs Err", () => {
 		const okRes = ok({ n: 1 })
-		const errRes = err("E")()
+		const errRes = err("E")
 
 		expect(okRes.value?.n).toBe(1) // ok branch exposes value
-		// @ts-expect-error value is undefined on Err at runtime
-		expect(errRes.value?.n).toBeUndefined()
+		expect((errRes as any).value?.n).toBeUndefined() // value is not present on Err
 	})
 
 	test("error? on Err vs Ok", () => {
 		const okRes = ok(5) as Result<number, { type: string }>
-		const errRes = err("Timeout")({ ms: 500 })
-		expect(okRes.error?.type).toBeUndefined()
+		const errRes = err("Timeout", { ms: 500 })
+		expect((okRes as any).error?.type).toBeUndefined()
 		expect(errRes.error?.type).toBe("Timeout")
+		expect(okRes.value ?? okRes.error).toBe(5)
+	})
+	test("error? on Err vs Ok", () => {
+		const okRes = ok(5) as Result<number, { type: string }>
+		const errRes = err("Timeout", { ms: 500 }) as Result<
+			number,
+			{ type: string }
+		>
+		expect((okRes as any).error?.type).toBeUndefined()
+		expect(errRes.error?.type).toBe("Timeout")
+		expect(errRes.value ?? errRes.error?.type).toBe("Timeout")
 	})
 })
 
 /* ------------------------------------------------------------------ */
 /* match() instance method                                             */
 /* ------------------------------------------------------------------ */
-describe("match() instance", () => {
+describe("match() function", () => {
 	test("branches correctly on Ok", () => {
 		const res = ok(5)
-		const doubled = res.match({
+		const doubled = match(res, {
 			ok: (v) => v * 2,
 			err: () => 0,
 		})
@@ -132,8 +145,8 @@ describe("match() instance", () => {
 	})
 
 	test("branches correctly on Err", () => {
-		const timeout = err("Timeout")({ ms: 1000 })
-		const txt = timeout.match({
+		const timeout = err("Timeout", { ms: 1000 })
+		const txt = match(timeout, {
 			ok: (v) => `value ${v}`,
 			err: (e) => e.type,
 		})
@@ -149,25 +162,25 @@ describe("matchType()", () => {
 		function multipleErrors() {
 			// biome-ignore lint/correctness/noConstantCondition: <explanation>
 			if (false) {
-				return err("a")()
+				return err("a")
 			} else {
-				return err("b")()
+				return err("b")
 			}
 		}
 
 		expect(
-			matchType(multipleErrors().error, {
-				a: (e) => e.type,
-				b: (e) => e.type,
+			match(multipleErrors().error, {
+				a: () => "a",
+				b: () => "b",
 			}),
 		).toBe("b")
 	})
 
 	test("exhaustively matches error variants", () => {
-		const timeout = err("Timeout")({ ms: 2500 })
+		const timeout = err("Timeout", { ms: 2500 })
 
-		const ms = matchType(timeout.error, {
-			Timeout: (e) => e.ms,
+		const ms = match(timeout.error.type, {
+			Timeout: () => timeout.error.ms,
 		})
 
 		expect(ms).toBe(2500)
