@@ -61,7 +61,7 @@ export function err<K extends string, P extends Record<string, unknown>>(
  * @example
  *   err('Timeout') // Err<{ type: 'Timeout' }>
  */
-export function err<K extends string>(type: K): Err<{ type: K }>
+export function err<K extends string>(type: K): Err<K>
 
 /**
  * Construct an error Result from an arbitrary error value (object, string, etc).
