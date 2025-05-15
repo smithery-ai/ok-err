@@ -10,7 +10,7 @@ A small opinionated TypeScript library providing strongly-typed `Result` objects
 
 * **Plain object compatibility** - an `Ok` is `{ ok: true, value }`, an `Err` is `{ ok: false, error }`. Log it, persist it, send it over the wire.
 * **Type‑level errors** - every possible failure is visible in the function signature (`Result<T, E>`), not thrown from the shadows. Rely on the type checker to ensure you handle every possible failure.
-* **Cause‑chain built‑in** - wrap lower‑level errors with the `annotate` function; walk the `cause` links later to see the full logical call stack.
+* **Cause‑chain built‑in** - link any parent error using the `cause()` helper; walk the `cause` links later to see the full logical call stack.
 * **Ergonomic** - helpers `map`, `flatMap`, `or` feel familiar to JS arrays.
 * **Re‑hydration** - after `JSON.parse`, call `result` to get a plain `Result` object.
 
@@ -25,7 +25,7 @@ A small opinionated TypeScript library providing strongly-typed `Result` objects
   - [Quick tour](#quick-tour)
     - [From try-catch to Result](#from-try-catch-to-result)
     - [Propagating context](#propagating-context)
-      - [How annotation works](#how-annotation-works)
+      - [How cause works](#how-cause-works)
     - [Working with async operations](#working-with-async-operations)
   - [Feature checklist](#feature-checklist)
   - [API reference](#api-reference)
@@ -34,6 +34,7 @@ A small opinionated TypeScript library providing strongly-typed `Result` objects
     - [Types](#types)
   - [JSON round‑trip example](#json-roundtrip-example)
   - [Error with cause example](#error-with-cause-example)
+  - [The `cause()` helper](#the-cause-helper)
   - [Pattern matching example](#pattern-matching-example)
     - [Pattern matching with `match`](#pattern-matching-with-match)
     - [Type Safety and Exhaustiveness](#type-safety-and-exhaustiveness)
@@ -110,26 +111,21 @@ console.log(greeted);                     // "Hello ADA!"
 Context propagation allows you to wrap lower-level errors with higher-level context as they move up through your application's layers so you know where the error occurred.
 
 ```ts
-function readConfig(): Result<string, ConfigErr> { … }
+function readConfig(): Result<string, ConfigErr> { /* ... */ }
 
 function boot(): Result<void, BootErr> {
   const cfg = readConfig();
   if (!cfg.ok) {
     // Add higher-level context while preserving the original error
-    return annotate(cfg, 'BootConfig', { phase: 'init' });
+    return err('BootConfig', { phase: 'init', ...cause(cfg) });
   }
   return ok();
 }
 ```
 
-#### How annotation works
+#### How cause works
 
-`annotate` creates a new error that wraps the original error:
-
-1. The original error becomes the `cause` property of the new error
-2. Any additional payload properties are merged into the new error
-
-This creates a discoverable, traceable error chain that's invaluable for debugging:
+`cause` creates a new object `{ cause: error }` that can be spread into your error payload. This creates a discoverable, traceable error chain that's useful for debugging:
 
 ```plain
 Err {
@@ -206,7 +202,7 @@ async function displayUserProfile(userId: string) {
 
 | ✔                                  | Feature                                 | Example |
 | ---------------------------------- | --------------------------------------- | ------- |
-| Typed constructors                 | `err('Timeout', { ms: 2000 })`          |
+| Typed constructors                 | `err({ type: 'Timeout', ms: 2000 })` or `err('Timeout', { ms: 2000 })`          |
 | `map`, `flatMap`, `or`             | `ok(1).map(x=>x+1).flatMap(fn).or(0)`   |
 | Works with **Promise**             | `await result(fetch(url))`              |
 | Cause‑chain + optional stack frame | `annotate(err(...), 'DB', {...})`       |
@@ -222,15 +218,15 @@ async function displayUserProfile(userId: string) {
 | function              | purpose                                                   |
 | --------------------- | --------------------------------------------------------- |
 | `ok(value)`           | success result                                            |
-| `err(type, payload?)` | typed error **+ trace**                                   |
-| `errAny(value)`       | error without a discriminant / trace                      |
+| `err(type, payload?)` | typed error, payload is merged with `{ type }` |
+| `err({ ... })`        | error from arbitrary value (object, string, etc) |
 | `result(x)`           | wrap a sync fn, a Promise, **or** re‑hydrate a raw object |
 
 ### Functions
 
 | function                           | purpose                                             |
 | ---------------------------------- | --------------------------------------------------- |
-| `annotate(result, type, payload?)` | add context + cause                                 |
+| `cause(error)`                     | wrap an error as a cause for another error          |
 | `match(result, { ok, err })`       | pattern match on Result (success/failure)           |
 | `match(type, cases)`               | pattern match on a discriminant string (exhaustive) |
 
@@ -245,7 +241,7 @@ type Result<T, E = unknown> = Ok<T> | Err<E>;
 ## JSON round‑trip example
 
 ```ts
-const errOut = err('DbConn', { host: 'db.local' });
+const errOut = err('DbConn', { host: 'db.local' }); // preferred
 const raw = JSON.stringify(errOut);
 
 const back = result(JSON.parse(raw)); // re‑hydrated
@@ -254,15 +250,39 @@ const back = result(JSON.parse(raw)); // re‑hydrated
 ## Error with cause example
 
 ```ts
-// Create an error chain
+import { err, cause } from 'okay-error';
+
+// Preferred: use err(type, payload) and cause()
 const ioError = err('IO', { errno: 'ENOENT' });
-const configError = annotate(ioError, 'ConfigFileMissing', { path: '/etc/app.json' });
-const bootError = annotate(configError, 'BootConfig', { phase: 'init' });
+const configError = err('ConfigFileMissing', { path: '/etc/app.json', ...cause(ioError) });
+const bootError = err('BootConfig', { phase: 'init', ...cause(configError) });
+
+// You can also chain inline:
+const chained = err('BootConfig', cause(
+  err('ConfigFileMissing', cause(
+    err('IO', { errno: 'ENOENT' })
+  ))
+));
 
 // Now you can navigate the error chain
 console.log(bootError.error.type);    // 'BootConfig'
 console.log(bootError.error.cause.type); // 'ConfigFileMissing'
 ```
+
+---
+
+## The `cause()` helper
+
+The `cause(error)` function is the idiomatic way to link any parent error as the cause of the current error—this parent could be a lower-level error, a related error, or any error that led to the current one:
+
+```ts
+const base = err('Base', { info: 123 })
+const wrapped = err('Higher', { ...cause(base), context: 'extra' })
+
+// wrapped.error.cause === base
+```
+
+This is preferred over annotate, and is composable for deep error chains.
 
 ## Pattern matching example
 

@@ -1,8 +1,6 @@
 import {
 	type Result,
-	annotate,
 	err,
-	errAny,
 	flatMap,
 	map,
 	mapErr,
@@ -11,6 +9,7 @@ import {
 	orElse,
 	result,
 	unwrap,
+	cause,
 } from "../src"
 
 /* ------------------------------------------------------------------ */
@@ -20,7 +19,6 @@ describe("constructors", () => {
 	test.each([
 		["ok", ok(1), true],
 		["err", err("X"), false],
-		["errUnknown", errAny(new Error()), false],
 	])("%s()", (_, r, expected) => {
 		expect(r.ok).toBe(expected)
 	})
@@ -91,12 +89,12 @@ describe("result()", () => {
 describe("annotate() function", () => {
 	test("wraps Err with context", () => {
 		const base = err("A", { id: 2 })
-		const ctx = annotate(base, "B", { extra: 1 })
+		const ctx = err("B", cause(base))
 
 		expect(!ctx.ok && ctx.error.type).toBe("B")
-		const cause = ctx.error.cause as { id: number; type: string }
-		expect(cause.id).toBe(2)
-		expect(cause.type).toBe("A")
+		const errCause = ctx.error.cause as { id: number; type: string }
+		expect(errCause.id).toBe(2)
+		expect(errCause.type).toBe("A")
 	})
 })
 

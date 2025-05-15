@@ -45,37 +45,50 @@ export function ok<T>(value?: T): Ok<T> {
 }
 
 /**
- * Construct an error Result with a discriminant type and optional payload.
+ * Construct an error Result with a type and payload.
  *
  * @example
- * err('Timeout', { ms: 1000 }) // { ok: false, error: { type: 'Timeout', ms: 1000 }}
+ *   err('Timeout', { ms: 1000 }) // Err<{ type: 'Timeout', ms: 1000 }>
  */
-export function err<
-	K extends string,
-	P extends Record<string, unknown> = Record<string, unknown>,
->(type: K, payload: P): Err<{ type: K } & P>
-export function err<E extends string>(payload: E): Err<E>
+export function err<K extends string, P extends Record<string, unknown>>(
+	type: K,
+	payload: P,
+): Err<{ type: K } & P>
 
 /**
- * Construct an error Result from a single error object.
+ * Construct an error Result with only a type.
  *
  * @example
- * err({ type: 'Timeout', ms: 1000 }) // { ok: false, error: { type: 'Timeout', ms: 1000 }}
- * err({ message: 'fail' }) // { ok: false, error: { message: 'fail' }}
+ *   err('Timeout') // Err<{ type: 'Timeout' }>
  */
-export function err<E>(payload: E): Err<E>
+export function err<K extends string>(type: K): Err<{ type: K }>
 
 /**
- * Implementation for err overloads. See overload docs for usage.
+ * Construct an error Result from an arbitrary error value (object, string, etc).
+ * Type safety and pattern matching only work if the value is an object with a `type` property.
+ *
+ * @example
+ *   err({ message: 'Something failed' })
+ *   err(new Error('fail'))
  */
+export function err<K>(payload: K): Err<K>
 export function err(typeOrPayload: any, payload?: any): Err<any> {
-	if (payload) {
+	if (payload !== undefined) {
 		return { ok: false, error: { type: typeOrPayload, ...payload } }
-	} else {
-		return { ok: false, error: typeOrPayload }
 	}
+	return { ok: false, error: typeOrPayload }
 }
 
+/**
+ * Helper to embed a cause error payload when constructing a new Err.
+ *
+ * @example
+ * const low = err('Low')
+ * const high = err('High', cause(low))
+ */
+export function cause<T extends { error: any }>(e: T): { cause: T["error"] } {
+	return { cause: e.error }
+}
 // ── Utility Functions (functional style) ────────────────
 
 export const map = <ValueType, NewValue, ErrorType = unknown>(
@@ -86,7 +99,7 @@ export const map = <ValueType, NewValue, ErrorType = unknown>(
 export const mapErr = <ValueType, ErrorType, NewError>(
 	r: Result<ValueType, ErrorType>,
 	fn: (e: ErrorType) => NewError,
-): Result<ValueType, NewError> => (r.ok ? r : errAny(fn(r.error)))
+): Result<ValueType, NewError> => (r.ok ? r : err(fn(r.error)))
 
 export const flatMap = <ValueType, NewValue, ErrorType = unknown>(
 	r: Result<ValueType, ErrorType>,
@@ -105,49 +118,30 @@ export const orElse = <ValueType, ErrorType = unknown>(
 	fallback: ValueType,
 ): ValueType => (r.ok ? r.value : fallback)
 
-export const annotate = <
-	ErrorType,
-	K extends string,
-	P extends Record<string, unknown> = Record<string, unknown>,
->(
-	r: Err<ErrorType>,
-	type: K,
-	payload: P = {} as P,
-): Err<{ type: K } & P & { cause: ErrorType }> => ({
-	ok: false,
-	error: {
-		type,
-		...payload,
-		cause: r.error,
-	} as { type: K } & P & { cause: ErrorType },
-})
-
 // ── Universal factory / wrapper / rehydrator ────────────
 
 const isPromiseLike = <T>(v: unknown): v is PromiseLike<T> =>
 	typeof v === "object" && v !== null && "then" in v
 
 export function result<ValueType>(work: () => ValueType): Result<ValueType>
-export function result<ValueType>(
+export function result<ValueType, ErrorType = unknown>(
 	work: PromiseLike<ValueType>,
-): Promise<Result<ValueType>>
+): Promise<Result<ValueType, ErrorType>>
 export function result<ValueType, ErrorType>(
 	work: (() => ValueType) | PromiseLike<ValueType>,
 ): Result<ValueType, ErrorType> | Promise<Result<ValueType, ErrorType>> {
 	if (isPromiseLike<ValueType>(work)) {
 		return Promise.resolve(work)
 			.then(ok<ValueType>)
-			.catch((e: unknown) => errAny<ErrorType>(e as ErrorType))
+			.catch((e: unknown) => err(e as ErrorType))
 	}
 
 	try {
 		return ok((work as () => ValueType)())
 	} catch (e) {
-		return errAny<ErrorType>(e as ErrorType)
+		return err(e as ErrorType)
 	}
 }
-
-// ── Universal matchType ─────────────────────────────────
 
 /**
  * Pattern match on a Result object (Ok/Err) or a discriminant string.
