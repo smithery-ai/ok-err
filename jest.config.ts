@@ -1,4 +1,6 @@
-module.exports = {
+import type { Config } from "jest"
+
+const config: Config = {
 	preset: "ts-jest",
 	testEnvironment: "node",
 	roots: ["<rootDir>/tests"],
@@ -13,3 +15,5 @@ module.exports = {
 	testRegex: "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
 	moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
 }
+
+export default config

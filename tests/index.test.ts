@@ -1,5 +1,6 @@
 import {
 	type Result,
+	cause,
 	err,
 	flatMap,
 	map,
@@ -9,7 +10,6 @@ import {
 	orElse,
 	result,
 	unwrap,
-	cause,
 } from "../src"
 
 /* ------------------------------------------------------------------ */
@@ -38,7 +38,7 @@ describe("Ok / Err methods", () => {
 	test("map / mapErr", () => {
 		const a = map(ok(2), double)
 		const b = map(err("E"), double)
-		const c = mapErr(err("E", { id: 1 }), (e) => ({ ...e, tag: "X" }))
+		const c = mapErr(err("E", { id: 1 }), e => ({ ...e, tag: "X" }))
 
 		expect(a.ok && a.value).toBe(4)
 		expect(!b.ok && b.error).toBe("E")
@@ -49,8 +49,8 @@ describe("Ok / Err methods", () => {
 		const div = (a: number, b: number): Result<number> =>
 			b === 0 ? err("Div0") : ok(a / b)
 
-		expect(flatMap(ok(10), (n) => div(n, 5)).ok).toBe(true)
-		expect(flatMap(ok(10), (n) => div(n, 0)).ok).toBe(false)
+		expect(flatMap(ok(10), n => div(n, 5)).ok).toBe(true)
+		expect(flatMap(ok(10), n => div(n, 0)).ok).toBe(false)
 	})
 
 	test("unwrap / or", () => {
@@ -136,7 +136,7 @@ describe("match() function", () => {
 	test("branches correctly on Ok", () => {
 		const res = ok(5)
 		const doubled = match(res, {
-			ok: (v) => v * 2,
+			ok: v => v * 2,
 			err: () => 0,
 		})
 		expect(doubled).toBe(10)
@@ -145,8 +145,8 @@ describe("match() function", () => {
 	test("branches correctly on Err", () => {
 		const timeout = err("Timeout", { ms: 1000 })
 		const txt = match(timeout, {
-			ok: (v) => `value ${v}`,
-			err: (e) => e.type,
+			ok: v => `value ${v}`,
+			err: e => e.type,
 		})
 		expect(txt).toBe("Timeout")
 	})
@@ -161,9 +161,8 @@ describe("matchType()", () => {
 			// biome-ignore lint/correctness/noConstantCondition: <explanation>
 			if (false) {
 				return err("a")
-			} else {
-				return err("b")
 			}
+			return err("b")
 		}
 
 		expect(
